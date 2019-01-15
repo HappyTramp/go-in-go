@@ -5,7 +5,7 @@ import (
 )
 
 type BoardIndexError struct {
-    y, x uint
+    y, x int
 }
 
 func (e *BoardIndexError) Error() string {

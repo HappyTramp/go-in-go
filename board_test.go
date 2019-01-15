@@ -1,15 +1,16 @@
 package go_in_go
 
 import (
-    "fmt"
     "testing"
+    "reflect"
+    "sort"
 )
 
 func TestNewBoard(t *testing.T) {
     tt := []struct{
         name string
         value *Board
-        expected_size uint
+        expected_size int
     }{
         {"9x9 board", NewBoard(9), 9},
         {"11x11 board", NewBoard(11), 11},
@@ -36,17 +37,21 @@ func TestGetPoint(t *testing.T) {
     board.grid[0][0] = 2
     board.grid[1][1] = 1
     tt := []struct{
-        y, x uint
+        y, x int
         value byte
+        err error
     }{
-        {0, 0, 2},
-        {1, 1, 1},
-        {3, 3, 0},
+        {0, 0, 2, nil},
+        {1, 1, 1, nil},
+        {3, 3, 0, nil},
+        {10, 0, 200, &BoardIndexError{10, 0}},
+        {0, 9, 200, &BoardIndexError{0, 9}},
     }
     for _, tc := range tt {
         p_value, err := board.GetPoint(tc.y, tc.x)
-        if err != nil {
-            t.Fatal(err)
+        if reflect.TypeOf(err) != reflect.TypeOf(tc.err) {
+            t.Fatalf("Didnt return correct error got: %T, expected: %T",
+                     err, tc.err)
         }
         if p_value != tc.value {
             t.Errorf("Point at [%d, %d] != %d, is %d",
@@ -58,48 +63,85 @@ func TestGetPoint(t *testing.T) {
 func TestSetPoint(t *testing.T) {
     board := NewBoard(9)
     tt := []struct{
-        y, x uint
+        y, x int
         value byte
+        err error
     }{
-        {0, 0, 2},
-        {1, 1, 1},
-        {3, 3, 2},
-        {3, 3, 0},
+        {0, 0, 2, nil},
+        {1, 1, 1, nil},
+        {3, 3, 2, nil},
+        {3, 3, 0, nil},
+        {9, 0, 0, &BoardIndexError{9, 0}},
+        {0, 11, 0, &BoardIndexError{0, 11}},
     }
     for _, tc := range tt {
         err := board.SetPoint(tc.y, tc.x, tc.value)
-        if err != nil {
-            t.Fatal(err)
+        if reflect.TypeOf(err) != reflect.TypeOf(tc.err) {
+            t.Fatalf("Didnt return correct error got: %T, expected: %T",
+                     err, tc.err)
         }
-        p_value := board.grid[tc.y][tc.x]
-        if p_value != tc.value {
-            t.Errorf("Point at [%d, %d] should have been set to %d, is %d",
-                     tc.y, tc.x, tc.value, p_value)
+        if tc.err == nil {
+            p_value := board.grid[tc.y][tc.x]
+            if p_value != tc.value {
+                t.Errorf("Point at [%d, %d] should have been set to %d, is %d",
+                         tc.y, tc.x, tc.value, p_value)
+            }
+        }
+    }
+}
+
+func TestNeighbours(t *testing.T) {
+    board := NewBoard(9)
+    board.SetPoint(3, 2, 1)
+    board.SetPoint(2, 3, 2)
+    board.SetPoint(4, 4, 2)
+    tt := []struct{
+        y, x int
+        neighbours []Point
+    }{
+        {0, 0, []Point{{0, 1, 0}, {1, 0, 0}}},
+        {2, 2, []Point{{2, 1, 0}, {2, 3, 2}, {1, 2, 0}, {3, 2, 1}}},
+        {3, 3, []Point{{3, 2, 1}, {3, 4, 0}, {2, 3, 2}, {4, 3, 0}}},
+        {3, 4, []Point{{3, 3, 0}, {3, 5, 0}, {2, 4, 0}, {4, 4, 2}}},
+    }
+    for _, tc := range tt {
+        sort.Slice(tc.neighbours, func(i, j int) bool {
+            return tc.neighbours[i].y < tc.neighbours[j].y
+        })
+        neighbours := board.Neighbours(tc.y, tc.x)
+        sort.Slice(neighbours, func(i, j int) bool {
+            return neighbours[i].y < neighbours[j].y
+        })
+        for i, n := range tc.neighbours {
+            if n != neighbours[i] {
+                t.Errorf("Wrong neighbours\ngot:      %v\nexpected: %v",
+                         neighbours, tc.neighbours)
+            }
         }
     }
 }
 
 func TestCorrectIndex(t *testing.T) {
     tt := []struct{
-        y, x uint
+        y, x int
         board *Board
-        description string
+        value bool
     }{
-        {0, 9, NewBoard(9), "[0, 9]"},
-        {9, 0, NewBoard(9), "[9, 0]"},
-        {0, 19, NewBoard(19), "[0, 19]"},
-        {11, 0, NewBoard(11), "[11, 0]"},
+        {0, 4, NewBoard(9), true},
+        {5, 0, NewBoard(9), true},
+        {0, 9, NewBoard(9), false},
+        {9, 0, NewBoard(9), false},
+        {0, -1, NewBoard(9), false},
+        {-1, 0, NewBoard(9), false},
+        {0, 19, NewBoard(19), false},
+        {11, 0, NewBoard(11), false},
     }
     for _, tc := range tt {
-        err := tc.board.correctIndex(tc.y, tc.x)
-        if err == nil {
-            t.Errorf("Index %s should return an error", tc.description)
+        if v := tc.board.correctIndex(tc.y, tc.x); v != tc.value {
+            t.Errorf("index [%d, %d] of board size %d is %t, got: %t",
+                    tc.y, tc.x, tc.board.size, tc.value, v)
         }
-        expected_format := fmt.Sprintf(
-            "BoardIndexError: %s is not a valid index",
-            tc.description)
-        if err.Error() != expected_format {
-            t.Errorf("Error %s is not formated correctly", tc.description)
-        }
+
     }
 }
+
