@@ -83,7 +83,7 @@ func TestSetPoint(t *testing.T) {
         if tc.err == nil {
             p_value := board.grid[tc.y][tc.x]
             if p_value != tc.value {
-                t.Errorf("Point at [%d, %d] should have been set to %d, is %d",
+                t.Errorf("Point at [%d, %d] should be set to %d, is %d",
                          tc.y, tc.x, tc.value, p_value)
             }
         }
@@ -97,26 +97,135 @@ func TestNeighbours(t *testing.T) {
     board.SetPoint(4, 4, 2)
     tt := []struct{
         y, x int
-        neighbours []Point
+        neighbours Group
     }{
-        {0, 0, []Point{{0, 1, 0}, {1, 0, 0}}},
-        {2, 2, []Point{{2, 1, 0}, {2, 3, 2}, {1, 2, 0}, {3, 2, 1}}},
-        {3, 3, []Point{{3, 2, 1}, {3, 4, 0}, {2, 3, 2}, {4, 3, 0}}},
-        {3, 4, []Point{{3, 3, 0}, {3, 5, 0}, {2, 4, 0}, {4, 4, 2}}},
+        {0, 0, Group{{0, 1, 0}, {1, 0, 0}}},
+        {2, 2, Group{{2, 1, 0}, {2, 3, 2}, {1, 2, 0}, {3, 2, 1}}},
+        {3, 3, Group{{3, 2, 1}, {3, 4, 0}, {2, 3, 2}, {4, 3, 0}}},
+        {3, 4, Group{{3, 3, 0}, {3, 5, 0}, {2, 4, 0}, {4, 4, 2}}},
     }
     for _, tc := range tt {
-        sort.Slice(tc.neighbours, func(i, j int) bool {
-            return tc.neighbours[i].y < tc.neighbours[j].y
-        })
         neighbours := board.Neighbours(tc.y, tc.x)
-        sort.Slice(neighbours, func(i, j int) bool {
-            return neighbours[i].y < neighbours[j].y
-        })
-        for i, n := range tc.neighbours {
-            if n != neighbours[i] {
-                t.Errorf("Wrong neighbours\ngot:      %v\nexpected: %v",
-                         neighbours, tc.neighbours)
-            }
+        if !comparePointSlice(neighbours, tc.neighbours) {
+            t.Errorf("Wrong neighbours\ngot:    %v\nexpect: %v",
+                     neighbours, tc.neighbours)
+        }
+    }
+}
+
+func TestUpdateGroup(t *testing.T) {
+    crossBoard := NewBoard(9)
+    surroundBoard := NewBoard(9)
+    tt := []struct{
+        name string
+        group Group
+        board *Board
+    }{
+        {"black cross board",
+         Group{{0, 1, 1}, {1, 1, 1}, {1, 0, 1}, {2, 1, 1}, {1, 2, 1}},
+         crossBoard},
+        {"white cross board",
+         Group{{2, 2, 2}, {2, 3, 2}, {1, 3, 2}, {3, 3, 2}, {2, 4, 2}},
+         crossBoard},
+        {"black surround board",
+         Group{{0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}},
+         surroundBoard},
+        {"white surround board",
+         Group{{2, 0, 2}, {2, 1, 2}, {2, 2, 2}, {1, 2, 2}, {0, 2, 2}},
+         surroundBoard},
+    }
+    for _, tc := range tt {
+        for _, p := range tc.group {
+            tc.board.SetPoint(p.y, p.x, p.value)
+        }
+    }
+    for _, tc := range tt {
+        group := Group{tc.group[0]}
+        group = tc.board.UpdateGroup(group)
+        if !comparePointSlice(group, tc.group) {
+            t.Errorf("Wrong group on %s\ngot:    %v\nexpect: %v",
+                     tc.name, group, tc.group)
+        }
+    }
+}
+
+func TestGroupFrom(t *testing.T) {
+
+}
+
+//func TestGroupLiberty(t *testing.T) {
+    //blackSurround := NewBoard(9)
+    //whiteSurround := NewBoard(9)
+    //tt := []struct{
+        //group Group
+        //liberty int
+        //board *Board
+    //}{
+        //{Group{{1, 1, 1}, {2, 1, 1}}, 0, blackSurround},
+        //{Group{{0, 1, 2}, {1, 0, 2}, {2, 0, 2},
+               //{3, 1, 2}, {1, 3, 2}, {2, 3, 2}},
+         //7, blackSurround},
+        //{Group{{8, 8, 2}, {7, 8, 2}, {6, 8, 2}}, 0, whiteSurround},
+        //{Group{{8, 7, 1}, {7, 7, 1}, {6, 7, 1}, {5, 7, 1}, {5, 8, 1}},
+         //5, whiteSurround},
+    //}
+    //for _, tc := range tt {
+        //liberty := tc.board.GroupLiberty(tc.group)
+        //if liberty != tc.liberty {
+            //t.Errorf("Liberty of %v should be %d, is %d",
+                     //tc.group, tc.liberty, liberty)
+        //}
+    //}
+//}
+
+func TestStoneLiberty(t *testing.T) {
+    board := NewBoard(9)
+    board.SetPoint(0, 0, White)
+    board.SetPoint(1, 1, White)
+    board.SetPoint(2, 0, White)
+    tt := []struct{
+        y, x int
+        liberty int
+    }{
+        {0, 0, 2},
+        {1, 0, 0},
+        {3, 0, 2},
+        {5, 5, 4},
+        {1, 2, 3},
+        {4, 8, 3},
+    }
+
+    for _, tc := range tt {
+        liberty := board.StoneLiberty(tc.y, tc.x)
+        if liberty != tc.liberty {
+            t.Errorf("Expected %d liberty at [%d, %d], got: %d",
+                     tc.liberty, tc.y, tc.x, liberty)
+        }
+    }
+}
+
+func TestDeleteGroup(t *testing.T) {
+    board := NewBoard(9)
+    blackGroup := Group{{0, 0, 1}, {0, 1, 1}, {1, 1, 1}}
+    whiteGroup := Group{{1, 0, 2}, {2, 0, 2}, {2, 1, 2}}
+    for i := 0; i < len(blackGroup); i++ {
+        s := blackGroup[i]
+        board.SetPoint(s.y, s.x, s.value)
+        s = whiteGroup[i]
+        board.SetPoint(s.y, s.x, s.value)
+    }
+    board.DeleteGroup(blackGroup)
+    for _, p := range blackGroup {
+        if v, _ := board.GetPoint(p.y, p.x); v != Empty {
+            t.Errorf("Member [%d, %d] of group %v should be deleted",
+                     p.y, p.x, blackGroup)
+        }
+    }
+    board.DeleteGroup(whiteGroup)
+    for _, p := range whiteGroup {
+        if v, _ := board.GetPoint(p.y, p.x); v != Empty {
+            t.Errorf("Member [%d, %d] of group %v should be deleted",
+                     p.y, p.x, whiteGroup)
         }
     }
 }
@@ -145,3 +254,20 @@ func TestCorrectIndex(t *testing.T) {
     }
 }
 
+func comparePointSlice(s1, s2 Group) bool {
+    if len(s1) != len(s2) {
+        return false
+    }
+    sort.Slice(s1, func(i, j int) bool {
+        return s1[i].y < s1[j].y
+    })
+    sort.Slice(s2, func(i, j int) bool {
+        return s2[i].y < s2[j].y
+    })
+    for i, p := range s1 {
+        if p.y != s2[i].y || p.x != s2[i].x || p.value != s2[i].value {
+            return false
+        }
+    }
+    return true
+}
