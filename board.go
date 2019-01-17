@@ -1,5 +1,8 @@
 package go_in_go
 
+import (
+    "fmt"
+)
 
 // The three state a point can be in
 const (
@@ -70,11 +73,11 @@ func (b *Board) Neighbours(y, x int) Group {
 func (b *Board) UpdateGroup(group Group) Group {
     for _, p := range group {
         for _, n := range b.Neighbours(p.y, p.x) {
-            if n.value == p.value && !containPoint(group, n) {
+            if n.value == p.value && !group.contain(n) {
                 group = append(group, n)
                 neighbourGroup := b.UpdateGroup(group)
                 for _, v := range neighbourGroup {
-                    if !containPoint(group, v) {
+                    if !group.contain(v) {
                         group = append(group, v)
                     }
                 }
@@ -94,11 +97,17 @@ func (b *Board) GroupFrom(y, x int) Group {
 }
 
 // Liberty of a group of stone
-func (b *Board) GroupLiberty(group Group) (liberty int) {
+func (b *Board) GroupLiberty(group Group) int {
+    libertyPoints := Group{}
     for _, s := range group {
-        liberty += b.StoneLiberty(s.y, s.x)
+        for _, n := range b.Neighbours(s.y, s.x) {
+            if n.value == Empty && !libertyPoints.contain(s) {
+                libertyPoints = append(libertyPoints, n)
+
+            }
+        }
     }
-    return
+    return len(libertyPoints)
 }
 
 // Liberty of one stone
@@ -122,10 +131,14 @@ func (b *Board) DeleteGroup(group Group) error {
     return nil
 }
 
+const notationLetters string = "ABCDEFGHJKLMNOPQRST"
 func (b *Board) String() (repr string) {
-    for _, r := range b.grid {
-        //repr += i
-        repr += "\n"
+    repr += "\n  "
+    for i := 0; i < b.size; i++ {
+        repr += fmt.Sprintf(" %c", notationLetters[i])
+    }
+    for i, r := range b.grid {
+        repr += fmt.Sprintf("\n%-2d ", i + 1)
         for _, v := range r {
             switch v {
             case Empty:
@@ -149,7 +162,7 @@ func (b *Board) correctIndex(y, x int) bool {
     return true
 }
 
-func containPoint(g Group, p Point) bool {
+func (g Group) contain(p Point) bool {
     for _, e := range g {
         if e == p {
             return true

@@ -106,7 +106,7 @@ func TestNeighbours(t *testing.T) {
     }
     for _, tc := range tt {
         neighbours := board.Neighbours(tc.y, tc.x)
-        if !comparePointSlice(neighbours, tc.neighbours) {
+        if !compareGroup(neighbours, tc.neighbours) {
             t.Errorf("Wrong neighbours\ngot:    %v\nexpect: %v",
                      neighbours, tc.neighbours)
         }
@@ -114,25 +114,68 @@ func TestNeighbours(t *testing.T) {
 }
 
 func TestUpdateGroup(t *testing.T) {
-    crossBoard := NewBoard(9)
-    surroundBoard := NewBoard(9)
+    board := NewBoard(9)
+    tt_groups := []Group{
+        Group{{0, 1, 1}, {1, 1, 1}, {1, 0, 1}, {2, 1, 1}, {1, 2, 1}},
+        Group{{2, 2, 2}, {2, 3, 2}, {1, 3, 2}, {3, 3, 2}, {2, 4, 2}},
+        Group{{8, 8, 1}, {8, 7, 1}, {7, 8, 1}, {7, 7, 1}},
+        Group{{8, 6, 2}, {7, 6, 2}, {6, 6, 2}, {6, 7, 2}, {6, 8, 2}},
+    }
+    for _, tc_group := range tt_groups {
+        for _, p := range tc_group {
+            board.SetPoint(p.y, p.x, p.value)
+        }
+    }
+    for _, tc_group := range tt_groups {
+        group := Group{tc_group[0]}
+        group = board.UpdateGroup(group)
+        if !compareGroup(group, tc_group) {
+            t.Errorf("Wrong group\ngot:    %v\nexpect: %v",
+                     group, tc_group)
+        }
+    }
+}
+
+func TestGroupFrom(t *testing.T) {
+    board := NewBoard(9)
     tt := []struct{
-        name string
+        y, x int
         group Group
+    }{
+        {0, 0, Group{{0, 0, 1}, {0, 1, 1}, {1, 1, 1}}},
+        {5, 4, Group{{5, 4, 1}, {6, 4, 1}, {7, 4, 1}, {8, 4, 1}}},
+        {3, 3, Group{{3, 3, 2}, {3, 2, 2}, {3, 1, 2}}},
+        {8, 8, Group{{8, 8, 2}, {7, 8, 2}, {8, 7, 2}}},
+    }
+    for _, tc := range tt {
+        for _, p := range tc.group {
+            board.SetPoint(p.y, p.x, p.value)
+        }
+    }
+    for _, tc := range tt {
+        group := board.GroupFrom(tc.y, tc.x)
+        if !compareGroup(group, tc.group) {
+            t.Errorf("Wrong group\ngot:    %v\nexpect: %v",
+                     group, tc.group)
+        }
+    }
+}
+
+func TestGroupLiberty(t *testing.T) {
+    blackSurround := NewBoard(9)
+    whiteSurround := NewBoard(9)
+    tt := []struct{
+        group Group
+        liberty int
         board *Board
     }{
-        {"black cross board",
-         Group{{0, 1, 1}, {1, 1, 1}, {1, 0, 1}, {2, 1, 1}, {1, 2, 1}},
-         crossBoard},
-        {"white cross board",
-         Group{{2, 2, 2}, {2, 3, 2}, {1, 3, 2}, {3, 3, 2}, {2, 4, 2}},
-         crossBoard},
-        {"black surround board",
-         Group{{0, 0, 1}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}},
-         surroundBoard},
-        {"white surround board",
-         Group{{2, 0, 2}, {2, 1, 2}, {2, 2, 2}, {1, 2, 2}, {0, 2, 2}},
-         surroundBoard},
+        {Group{{1, 1, 1}, {2, 1, 1}}, 0, blackSurround},
+        {Group{{0, 0, 2}, {0, 1, 2}, {1, 0, 2}, {2, 0, 2}, {0, 2, 2},
+               {3, 1, 2}, {1, 2, 2}, {2, 2, 2}, {3, 0, 2}, {3, 2, 2}},
+         7, blackSurround},
+        {Group{{8, 8, 2}, {7, 8, 2}, {6, 8, 2}}, 0, whiteSurround},
+        {Group{{8, 7, 1}, {7, 7, 1}, {6, 7, 1}, {5, 7, 1}, {5, 8, 1}},
+         6, whiteSurround},
     }
     for _, tc := range tt {
         for _, p := range tc.group {
@@ -140,43 +183,13 @@ func TestUpdateGroup(t *testing.T) {
         }
     }
     for _, tc := range tt {
-        group := Group{tc.group[0]}
-        group = tc.board.UpdateGroup(group)
-        if !comparePointSlice(group, tc.group) {
-            t.Errorf("Wrong group on %s\ngot:    %v\nexpect: %v",
-                     tc.name, group, tc.group)
+        liberty := tc.board.GroupLiberty(tc.group)
+        if liberty != tc.liberty {
+            t.Errorf("Liberty of %v should be %d, is %d",
+                     tc.group, tc.liberty, liberty)
         }
     }
 }
-
-func TestGroupFrom(t *testing.T) {
-
-}
-
-//func TestGroupLiberty(t *testing.T) {
-    //blackSurround := NewBoard(9)
-    //whiteSurround := NewBoard(9)
-    //tt := []struct{
-        //group Group
-        //liberty int
-        //board *Board
-    //}{
-        //{Group{{1, 1, 1}, {2, 1, 1}}, 0, blackSurround},
-        //{Group{{0, 1, 2}, {1, 0, 2}, {2, 0, 2},
-               //{3, 1, 2}, {1, 3, 2}, {2, 3, 2}},
-         //7, blackSurround},
-        //{Group{{8, 8, 2}, {7, 8, 2}, {6, 8, 2}}, 0, whiteSurround},
-        //{Group{{8, 7, 1}, {7, 7, 1}, {6, 7, 1}, {5, 7, 1}, {5, 8, 1}},
-         //5, whiteSurround},
-    //}
-    //for _, tc := range tt {
-        //liberty := tc.board.GroupLiberty(tc.group)
-        //if liberty != tc.liberty {
-            //t.Errorf("Liberty of %v should be %d, is %d",
-                     //tc.group, tc.liberty, liberty)
-        //}
-    //}
-//}
 
 func TestStoneLiberty(t *testing.T) {
     board := NewBoard(9)
@@ -254,7 +267,79 @@ func TestCorrectIndex(t *testing.T) {
     }
 }
 
-func comparePointSlice(s1, s2 Group) bool {
+func TestString(t *testing.T) {
+    board9 := NewBoard(9)
+    board9.SetPoint(0, 0, 1)
+    board9.SetPoint(5, 4, 1)
+    board9.SetPoint(8, 8, 2)
+    board11 := NewBoard(11)
+    board11.SetPoint(4, 0, 1)
+    board11.SetPoint(5, 0, 1)
+    board11.SetPoint(6, 0, 2)
+    board19 := NewBoard(19)
+    board19.SetPoint(18, 17, 2)
+    board19.SetPoint(18, 18, 1)
+    board19.SetPoint(17, 18, 2)
+    tt := []struct{
+        board *Board
+        stringRepr string
+    }{
+        {board9, `
+   A B C D E F G H J
+1  X . . . . . . . . 
+2  . . . . . . . . . 
+3  . . . . . . . . . 
+4  . . . . . . . . . 
+5  . . . . . . . . . 
+6  . . . . X . . . . 
+7  . . . . . . . . . 
+8  . . . . . . . . . 
+9  . . . . . . . . O `},
+        {board11, `
+   A B C D E F G H J K L
+1  . . . . . . . . . . . 
+2  . . . . . . . . . . . 
+3  . . . . . . . . . . . 
+4  . . . . . . . . . . . 
+5  X . . . . . . . . . . 
+6  X . . . . . . . . . . 
+7  O . . . . . . . . . . 
+8  . . . . . . . . . . . 
+9  . . . . . . . . . . . 
+10 . . . . . . . . . . . 
+11 . . . . . . . . . . . `},
+        {board19, `
+   A B C D E F G H J K L M N O P Q R S T
+1  . . . . . . . . . . . . . . . . . . . 
+2  . . . . . . . . . . . . . . . . . . . 
+3  . . . . . . . . . . . . . . . . . . . 
+4  . . . . . . . . . . . . . . . . . . . 
+5  . . . . . . . . . . . . . . . . . . . 
+6  . . . . . . . . . . . . . . . . . . . 
+7  . . . . . . . . . . . . . . . . . . . 
+8  . . . . . . . . . . . . . . . . . . . 
+9  . . . . . . . . . . . . . . . . . . . 
+10 . . . . . . . . . . . . . . . . . . . 
+11 . . . . . . . . . . . . . . . . . . . 
+12 . . . . . . . . . . . . . . . . . . . 
+13 . . . . . . . . . . . . . . . . . . . 
+14 . . . . . . . . . . . . . . . . . . . 
+15 . . . . . . . . . . . . . . . . . . . 
+16 . . . . . . . . . . . . . . . . . . . 
+17 . . . . . . . . . . . . . . . . . . . 
+18 . . . . . . . . . . . . . . . . . . O 
+19 . . . . . . . . . . . . . . . . . O X `},
+    }
+    for _, tc := range tt {
+        stringRepr := tc.board.String()
+        if stringRepr != tc.stringRepr {
+            t.Errorf("Wrong string representation\ngot: %v\nexpected: %v",
+                    stringRepr, tc.stringRepr)
+        }
+    }
+}
+
+func compareGroup(s1, s2 Group) bool {
     if len(s1) != len(s2) {
         return false
     }
@@ -264,8 +349,8 @@ func comparePointSlice(s1, s2 Group) bool {
     sort.Slice(s2, func(i, j int) bool {
         return s2[i].y < s2[j].y
     })
-    for i, p := range s1 {
-        if p.y != s2[i].y || p.x != s2[i].x || p.value != s2[i].value {
+    for i := range s1 {
+        if s1[i] != s2[i] {
             return false
         }
     }
