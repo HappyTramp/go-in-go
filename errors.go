@@ -9,6 +9,7 @@ type BoardIndexError struct {
 }
 
 func (e *BoardIndexError) Error() string {
-    return fmt.Sprintf("BoardIndexError: [%d, %d] is not a valid index",
-                       e.y, e.x)
+    return fmt.Sprintf(
+        "BoardIndexError: [%d, %d] is not a valid index",
+        e.y, e.x)
 }

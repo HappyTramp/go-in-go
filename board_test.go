@@ -6,10 +6,11 @@ import (
     "sort"
 )
 
+
 func TestNewBoard(t *testing.T) {
     tt := []struct{
         name string
-        value *Board
+        board *Board
         expected_size int
     }{
         {"9x9 board", NewBoard(9), 9},
@@ -17,33 +18,34 @@ func TestNewBoard(t *testing.T) {
         {"19x19 board", NewBoard(19), 19},
     }
     for _, tc := range tt {
-        if tc.value.size != tc.expected_size {
+        if tc.board.size != tc.expected_size {
             t.Errorf("%s size != %d, is %d",
-                     tc.name, tc.expected_size, tc.value.size,)
+                     tc.name, tc.expected_size, tc.board.size)
         }
-        for i := range tc.value.grid {
-            for j := range tc.value.grid[i] {
-                if tc.value.grid[i][j] != 0 {
+        for i := range tc.board.grid {
+            for j := range tc.board.grid[i] {
+                if tc.board.grid[i][j] != 0 {
                     t.Errorf("%s grid at [%d, %d] is %d, should be 0",
-                             tc.name, i, j, tc.value.grid[i][j])
+                             tc.name, i, j, tc.board.grid[i][j])
                 }
             }
         }
     }
 }
 
+
 func TestGetPoint(t *testing.T) {
     board := NewBoard(9)
-    board.grid[0][0] = 2
-    board.grid[1][1] = 1
+    board.grid[0][0] = White
+    board.grid[1][1] = Black
     tt := []struct{
         y, x int
         value byte
         err error
     }{
-        {0, 0, 2, nil},
-        {1, 1, 1, nil},
-        {3, 3, 0, nil},
+        {0, 0, White, nil},
+        {1, 1, Black, nil},
+        {3, 3, Empty, nil},
         {10, 0, 200, &BoardIndexError{10, 0}},
         {0, 9, 200, &BoardIndexError{0, 9}},
     }
@@ -60,6 +62,7 @@ func TestGetPoint(t *testing.T) {
     }
 }
 
+
 func TestSetPoint(t *testing.T) {
     board := NewBoard(9)
     tt := []struct{
@@ -67,10 +70,10 @@ func TestSetPoint(t *testing.T) {
         value byte
         err error
     }{
-        {0, 0, 2, nil},
-        {1, 1, 1, nil},
-        {3, 3, 2, nil},
-        {3, 3, 0, nil},
+        {0, 0, White, nil},
+        {1, 1, Black, nil},
+        {3, 3, White, nil},
+        {3, 3, Empty, nil},
         {9, 0, 0, &BoardIndexError{9, 0}},
         {0, 11, 0, &BoardIndexError{0, 11}},
     }
@@ -89,6 +92,7 @@ func TestSetPoint(t *testing.T) {
         }
     }
 }
+
 
 func TestNeighbours(t *testing.T) {
     board := NewBoard(9)
@@ -113,6 +117,7 @@ func TestNeighbours(t *testing.T) {
     }
 }
 
+
 func TestUpdateGroup(t *testing.T) {
     board := NewBoard(9)
     tt_groups := []Group{
@@ -135,6 +140,7 @@ func TestUpdateGroup(t *testing.T) {
         }
     }
 }
+
 
 func TestGroupFrom(t *testing.T) {
     board := NewBoard(9)
@@ -160,6 +166,7 @@ func TestGroupFrom(t *testing.T) {
         }
     }
 }
+
 
 func TestGroupLiberty(t *testing.T) {
     blackSurround := NewBoard(9)
@@ -191,6 +198,7 @@ func TestGroupLiberty(t *testing.T) {
     }
 }
 
+
 func TestStoneLiberty(t *testing.T) {
     board := NewBoard(9)
     board.SetPoint(0, 0, White)
@@ -217,6 +225,7 @@ func TestStoneLiberty(t *testing.T) {
     }
 }
 
+
 func TestDeleteGroup(t *testing.T) {
     board := NewBoard(9)
     blackGroup := Group{{0, 0, 1}, {0, 1, 1}, {1, 1, 1}}
@@ -242,6 +251,42 @@ func TestDeleteGroup(t *testing.T) {
         }
     }
 }
+
+
+func TestUpdateScore(t *testing.T) {
+    board := NewBoard(9)
+    board.UpdateScore(1, 100)
+    board.UpdateScore(2, 150)
+    if board.player1Score != 100 {
+        t.Errorf("Player 1 score should be 100, is %d",
+                 board.player1Score)
+    }
+    if board.player2Score != 150 {
+        t.Errorf("Player 2 score should be 150, is %d",
+                 board.player2Score)
+    }
+}
+
+
+func TestKoDetection(t *testing.T) {
+    board := NewBoard(9)
+    blackGroup := Group{{0, 1, 1}, {1, 0, 1}, {2, 1, 1}, {1, 2, 0}}
+    whiteGroup := Group{{0, 2, 2}, {2, 2, 2}, {1, 3, 2}}
+    koMove := Point{1, 1, White}
+    for _, v := range blackGroup {
+        board.SetPoint(v.y, v.x, v.value)
+    }
+    for _, v := range whiteGroup {
+        board.SetPoint(v.y, v.x, v.value)
+    }
+    previousBoard := board.clone()
+    previousBoard.SetPoint(1, 2, Empty)
+    previousBoard.SetPoint(1, 1, White)
+    if board.KoDetection(previousBoard, koMove) != true {
+        t.Errorf("ko move %v hasn't been detected", koMove)
+    }
+}
+
 
 func TestCorrectIndex(t *testing.T) {
     tt := []struct{
@@ -286,49 +331,49 @@ func TestString(t *testing.T) {
     }{
         {board9, `
    A B C D E F G H J
-1  X . . . . . . . . 
-2  . . . . . . . . . 
-3  . . . . . . . . . 
-4  . . . . . . . . . 
-5  . . . . . . . . . 
-6  . . . . X . . . . 
-7  . . . . . . . . . 
-8  . . . . . . . . . 
-9  . . . . . . . . O `},
+1  X . . . . . . . .
+2  . . . . . . . . .
+3  . . . . . . . . .
+4  . . . . . . . . .
+5  . . . . . . . . .
+6  . . . . X . . . .
+7  . . . . . . . . .
+8  . . . . . . . . .
+9  . . . . . . . . O`},
         {board11, `
    A B C D E F G H J K L
-1  . . . . . . . . . . . 
-2  . . . . . . . . . . . 
-3  . . . . . . . . . . . 
-4  . . . . . . . . . . . 
-5  X . . . . . . . . . . 
-6  X . . . . . . . . . . 
-7  O . . . . . . . . . . 
-8  . . . . . . . . . . . 
-9  . . . . . . . . . . . 
-10 . . . . . . . . . . . 
-11 . . . . . . . . . . . `},
+1  . . . . . . . . . . .
+2  . . . . . . . . . . .
+3  . . . . . . . . . . .
+4  . . . . . . . . . . .
+5  X . . . . . . . . . .
+6  X . . . . . . . . . .
+7  O . . . . . . . . . .
+8  . . . . . . . . . . .
+9  . . . . . . . . . . .
+10 . . . . . . . . . . .
+11 . . . . . . . . . . .`},
         {board19, `
    A B C D E F G H J K L M N O P Q R S T
-1  . . . . . . . . . . . . . . . . . . . 
-2  . . . . . . . . . . . . . . . . . . . 
-3  . . . . . . . . . . . . . . . . . . . 
-4  . . . . . . . . . . . . . . . . . . . 
-5  . . . . . . . . . . . . . . . . . . . 
-6  . . . . . . . . . . . . . . . . . . . 
-7  . . . . . . . . . . . . . . . . . . . 
-8  . . . . . . . . . . . . . . . . . . . 
-9  . . . . . . . . . . . . . . . . . . . 
-10 . . . . . . . . . . . . . . . . . . . 
-11 . . . . . . . . . . . . . . . . . . . 
-12 . . . . . . . . . . . . . . . . . . . 
-13 . . . . . . . . . . . . . . . . . . . 
-14 . . . . . . . . . . . . . . . . . . . 
-15 . . . . . . . . . . . . . . . . . . . 
-16 . . . . . . . . . . . . . . . . . . . 
-17 . . . . . . . . . . . . . . . . . . . 
-18 . . . . . . . . . . . . . . . . . . O 
-19 . . . . . . . . . . . . . . . . . O X `},
+1  . . . . . . . . . . . . . . . . . . .
+2  . . . . . . . . . . . . . . . . . . .
+3  . . . . . . . . . . . . . . . . . . .
+4  . . . . . . . . . . . . . . . . . . .
+5  . . . . . . . . . . . . . . . . . . .
+6  . . . . . . . . . . . . . . . . . . .
+7  . . . . . . . . . . . . . . . . . . .
+8  . . . . . . . . . . . . . . . . . . .
+9  . . . . . . . . . . . . . . . . . . .
+10 . . . . . . . . . . . . . . . . . . .
+11 . . . . . . . . . . . . . . . . . . .
+12 . . . . . . . . . . . . . . . . . . .
+13 . . . . . . . . . . . . . . . . . . .
+14 . . . . . . . . . . . . . . . . . . .
+15 . . . . . . . . . . . . . . . . . . .
+16 . . . . . . . . . . . . . . . . . . .
+17 . . . . . . . . . . . . . . . . . . .
+18 . . . . . . . . . . . . . . . . . . O
+19 . . . . . . . . . . . . . . . . . O X`},
     }
     for _, tc := range tt {
         stringRepr := tc.board.String()
